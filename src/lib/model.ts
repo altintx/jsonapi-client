@@ -193,17 +193,19 @@ BaseModel.fromJsonApi = function (body) {
 
     // Attributes
     for (let [attribute, value] of Object.entries(body.data.attributes ?? {})) {
+      const attributeName = schema.transformPropertyName(attribute, schema.options?.serverTransform, schema.options?.clientTransform);
       const property = schema.attributes[attribute];
 
       if (property?.type === Date && value) {
         value = new Date(value);
       }
 
-      doc.set(attribute, value, { skipMarkModified: true });
+      doc.set(attributeName, value, { skipMarkModified: true });
     }
 
     // Relationships
     for (const [relationship, value] of Object.entries(body.data.relationships ?? {})) {
+      const relationshipName = schema.transformPropertyName(relationship, schema.options?.serverTransform, schema.options?.clientTransform);
       if (Array.isArray(value.data)) {
         const related = value.data.map((identifier) => {
           const model = models[identifier.type];
@@ -214,7 +216,7 @@ BaseModel.fromJsonApi = function (body) {
           });
         });
 
-        doc.set(relationship, related, { skipMarkModified: true });
+        doc.set(relationshipName, related, { skipMarkModified: true });
       } else if (value.data) {
         const identifier = value.data;
         const model = models[identifier.type];
@@ -224,7 +226,7 @@ BaseModel.fromJsonApi = function (body) {
           data: body.included!.find((resource) => resource.type === identifier.type && resource.id === identifier.id),
         });
 
-        doc.set(relationship, related, { skipMarkModified: true });
+        doc.set(relationshipName, related, { skipMarkModified: true });
       }
     }
 
@@ -473,24 +475,26 @@ BaseModel.prototype.toJsonApi = function () {
       }
     }
 
-    data.attributes![attribute] = value;
+    const attributeName = this.schema.transformPropertyName(attribute, this.schema.options?.clientTransform, this.schema.options?.serverTransform);
+    data.attributes![attributeName] = value;
   }
 
   for (const [relationship, property] of Object.entries(this.schema.relationships)) {
+    const relationshipName = this.schema.transformPropertyName(relationship, this.schema.options?.clientTransform, this.schema.options?.serverTransform);
     if (!this.isNew && !this.isModified(relationship)) continue;
 
     const value = this.get(relationship) as ModelInstance<Record<string, any>> | ModelInstance<Record<string, any>>[] | null;
 
     if (Array.isArray(value)) {
-      data.relationships![relationship] = {
+      data.relationships![relationshipName] = {
         data: value.map((val) => val.identifier()),
       };
     } else if (value) {
-      data.relationships![relationship] = {
+      data.relationships![relationshipName] = {
         data: value.identifier(),
       };
     } else {
-      data.relationships![relationship] = {
+      data.relationships![relationshipName] = {
         data: null,
       };
     }
